@@ -2,8 +2,8 @@
 An analysis of conditions contributed to COVID-19 deaths.
 
 Analysis of COVID-19 data
-  Objective of analysis: To figure out which conditions to prioritize when treating patients with COVID.
-First, I downloaded the data from [here,](https://catalog.data.gov/dataset/conditions-contributing-to-deaths-involving-coronavirus-disease-2019-covid-19-by-age-group) and I performed data exploration making sure the data was clean. I changed a few of the data types in the test columns from double to number when importing the data to Microsoft SQL Server Studio.
+  Objective of analysis: To figure out how to best allocate resources to help the population effectively in the next outbreak of a highly infective virus.
+First, I downloaded the data from [here,](https://data.cityofchicago.org/Health-Human-Services/COVID-19-Cases-Tests-and-Deaths-by-ZIP-Code/yhhz-zm2v/about_data) and I performed data exploration making sure the data was clean. I changed a few of the data types in the test columns from double to number when importing the data to Microsoft SQL Server Studio.
   To-do list for cleaning data:
 1.	Look for null values. There are 15,236 null values in the zip code column. I checked to see how many zip codes there are in IL.
   a.	I’ve created two CTEs to try to compare the null and not null zip codes to see if there were any similarities in the data. Turns out there isn’t, but the population   for some of the populations are the same in the rows with zip codes and null zip codes.
