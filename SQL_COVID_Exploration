@@ -1,0 +1,133 @@
+--Data Exploration
+
+SELECT zip_code, 
+	population
+FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+ORDER BY population DESC
+WHERE Population IS NULL;
+ 
+-- Replace with an actual common identifier between the two sets of data
+
+-- Compare rows with null and non-null ZIP codes side by side with row numbers using CTEs
+WITH NullZip AS (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS row_num,
+        zip_code,
+        Week_Number,
+        Cases_Cumulative,
+        Percent_Tested_Positive_Cumulative,
+        Deaths_Cumulative,
+        LTRIM(RTRIM(Population)) AS Population
+    FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+    WHERE zip_code IS NULL
+),
+NotNullZip AS (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS row_num,
+        zip_code,
+        Week_Number,
+        Cases_Cumulative,
+        Percent_Tested_Positive_Cumulative,
+        Deaths_Cumulative,
+        LTRIM(RTRIM(Population)) AS Population
+    FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+    WHERE zip_code IS NOT NULL
+)
+-- Additional checks after CTEs
+SELECT
+    NullZip.row_num AS null_row_num,
+    NullZip.zip_code AS null_zip_code,
+    NullZip.Week_Number AS null_week_number,
+    NullZip.Percent_Tested_Positive_Cumulative AS null_PTPC,
+    NullZip.Population AS null_population,
+    not_null_zip.row_num AS not_null_row_num,
+    not_null_zip.zip_code AS not_null_zip_code,
+    not_null_zip.Week_Number AS not_null_week_number,
+    not_null_zip.Percent_Tested_Positive_Cumulative AS not_null_PTPC,
+    not_null_zip.Population AS not_null_population,
+    -- Count rows in NullZip CTE
+    (SELECT COUNT(*) FROM NullZip) AS null_zip_count,
+    -- Count rows in NotNullZip CTE
+    (SELECT COUNT(*) FROM NotNullZip) AS not_null_zip_count
+FROM
+    NullZip
+FULL JOIN
+    NotNullZip not_null_zip ON NullZip.row_num = not_null_zip.row_num
+                           AND NullZip.population = not_null_zip.population;
+
+-- Check for null values in the original data
+SELECT COUNT(*) AS null_values_count
+FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+WHERE zip_code IS NULL;
+
+-- Check for duplicates in NotNullZip CTE
+WITH NotNullZip AS (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS row_num,
+        zip_code,
+        Week_Number,
+        Cases_Cumulative,
+        Percent_Tested_Positive_Cumulative,
+        Deaths_Cumulative,
+        LTRIM(RTRIM(Population)) AS Population
+    FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+    WHERE zip_code IS NOT NULL
+)
+SELECT zip_code, COUNT(*) AS duplicate_count
+FROM NotNullZip
+GROUP BY zip_code
+HAVING COUNT(*) > 1;
+
+--Changing the Zip code type to int from nvarchar
+SELECT 
+	CAST(ZIP_Code as int) as Zip_Code,
+	Week_Start,
+	Week_Number,
+	Cases_Weekly,
+	Tests_Weekly,
+	Deaths_Weekly,
+	Population
+FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+WHERE ZIP_Code IS NOT NULL AND ZIP_Code != 'Unknown'
+ORDER BY Week_Number ASC, Population
+
+--Possible join statement to check if populations in NULL Zip Codes = other zip codes
+SELECT *
+FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+ORDER BY ZIP_Code
+
+SELECT
+	Zip_Code,
+	Week_Start,
+	Week_Number,
+	Cases_Weekly,
+	Tests_Weekly,
+	Deaths_Weekly,
+	Population
+FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+WHERE ZIP_Code != 'Unknown'
+ORDER BY  Zip_Code, Week_Number ASC, Population;
+
+--Making a subquery to find the zip codes with the highest percentage 
+--of deaths relative to the total population
+SELECT DISTINCT
+	ZIP_code, 
+	population
+FROM COVID_IL_Data.dbo.[COVID-19_IL_Data]
+WHERE Population IS NOT NULL AND Population != 0 AND ZIP_Code IS NOT NULL
+ORDER BY ZIP_Code DESC;
+
+SELECT DISTINCT 
+	ZIP_Code,
+	population,
+	(SELECT (MAX(Deaths_cumulative) * population)/100 as percent_death
+	FROM dbo.[COVID-19_IL_Data])
+FROM dbo.[COVID-19_IL_Data];
+
+SELECT DISTINCT
+    ZIP_Code,
+    Population,
+    MAX(Deaths_Cumulative) OVER (PARTITION BY ZIP_Code) AS MaxDeaths,
+    (MAX(Deaths_Cumulative) * 100.0) / Population AS PercentDeath
+FROM dbo.[COVID-19_IL_Data];
+
