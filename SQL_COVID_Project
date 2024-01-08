@@ -1,0 +1,133 @@
+-- Data Exploration
+SELECT *
+FROM dbo.IL_COVID_ZIP_Code_V1;
+
+SELECT *
+FROM dbo.COVID_19_Daily_Vaccinations;
+
+/*
+Separating the zip codes by Chicago and non-Chicago
+Add a new column 'City' to the existing zip code table
+*/
+ALTER TABLE dbo.IL_COVID_ZIP_Code_V1
+ADD City VARCHAR(50);
+
+-- Update the 'City' column based on the zip code
+UPDATE dbo.IL_COVID_ZIP_Code_V1
+SET City = 
+    CASE 
+        WHEN ZIP_Code IN ('60601', '60602', '60603', '60604', '60605', '60606', '60607', '60608', '60609', '60610', '60611', '60612', '60613', '60614', '60615', '60616', '60617', '60618', '60619', '60620', '60621', '60622', '60623', '60624', '60625', '60626', '60628', '60629', '60630', '60631', '60632', '60633', '60634', '60636', '60637', '60638', '60639', '60640', '60641', '60642', '60643', '60644', '60645', '60646', '60647', '60649', '60651', '60652', '60653', '60654', '60655', '60656', '60657', '60659', '60660', '60661', '60664', '60666', '60668', '60669', '60670', '60673', '60674', '60675', '60677', '60678', '60680', '60681', '60682', '60684', '60685', '60686', '60687', '60688', '60689', '60690', '60691', '60693', '60694', '60695', '60696', '60697', '60699', '60701', '60706', '60707', '60803', '60804', '60805', '60827')
+            THEN 'Chicago'
+        ELSE 'Non-Chicago'
+    END;
+
+/*
+Population Analysis
+This query doublechecks that the population doesn't change at all in this dataset.
+*/
+
+SELECT 
+    Zip_Code,
+    COUNT(DISTINCT Population) as Distinct_Population
+FROM dbo.IL_COVID_ZIP_Code_V1
+GROUP BY Zip_Code
+HAVING COUNT(DISTINCT Population) > 1;
+
+-- Weekly Progression Analysis
+SELECT
+    ZIP_Code,
+    Week_Number,
+    Week_Start,
+    Cases_Weekly,
+    Deaths_Weekly
+FROM dbo.IL_COVID_ZIP_Code_V1
+WHERE Cases_Weekly > 0 AND Deaths_Weekly > 0
+ORDER BY Week_Start, WEEK_Number, ZIP_Code;
+
+-- Highest Infection Rate Analysis
+WITH RankedData AS (
+    SELECT
+        ZIP_Code,
+        Week_Number,
+        Week_Start,
+        Cases_Weekly,
+        Population,
+        ROW_NUMBER() OVER (PARTITION BY ZIP_Code ORDER BY (Cases_Weekly * 100.0) / NULLIF(Population, 0) DESC) AS Rank_Highest_Infection_Rate
+    FROM dbo.IL_COVID_ZIP_Code_V1
+    WHERE Cases_Weekly > 0
+)
+
+SELECT
+    ZIP_Code,
+    Week_Number,
+    Week_Start,
+    Cases_Weekly,
+    Population
+FROM RankedData
+WHERE Rank_Highest_Infection_Rate = 1
+ORDER BY ZIP_Code;
+
+/* 
+Percentage of Deaths Analysis
+Calculating highest percentage of deaths per zip code.
+*/
+
+SELECT
+    ZIP_Code,
+    Week_Number,
+    Week_Start,
+	Cases_Weekly,
+	Deaths_Weekly,
+    MAX(Cases_Weekly) AS Max_Cases_Weekly,
+	MAX(Deaths_Weekly) AS Max_Deaths_Weekly,
+    LEAST(MAX(Deaths_Weekly) * 100.0 / NULLIF(MAX(Cases_Weekly), 0), 100) AS Percent_Positive_Deaths,
+	Population
+FROM dbo.IL_COVID_ZIP_Code_V1
+WHERE Cases_Weekly > 0 AND Deaths_Weekly > 0
+GROUP BY ZIP_Code, Week_Number, Week_Start, Cases_Weekly, Deaths_Weekly, Population
+ORDER BY Percent_Positive_Deaths DESC;
+
+--Calculating lowest percentage of deaths per zip code.
+SELECT
+    ZIP_Code,
+    Week_Number,
+    Week_Start,
+	Cases_Weekly,
+	Deaths_Weekly,
+    MIN(Cases_Weekly) AS Min_Cases_Weekly,
+	MIN(Deaths_Weekly) AS Min_Deaths_Weekly,
+    LEAST(MIN(Deaths_Weekly) * 100.0 / NULLIF(MIN(Cases_Weekly), 0), 100) AS Percent_Positive_Deaths,
+	Population
+FROM dbo.IL_COVID_ZIP_Code_V1
+WHERE Cases_Weekly > 0 AND Deaths_Weekly > 0 AND Population <> 0
+GROUP BY ZIP_Code, Week_Number, Week_Start, Cases_Weekly, Deaths_Weekly, Population
+ORDER BY Percent_Positive_Deaths DESC;
+
+--Figuring out the highest and lowest cumulative death percentage per zip code.
+WITH RankedData AS (
+    SELECT
+        ZIP_Code,
+        Week_Number,
+        Week_Start,
+        Cases_Cumulative,
+        Deaths_Cumulative,
+        ROW_NUMBER() OVER (PARTITION BY ZIP_Code ORDER BY Deaths_Cumulative * 100.0 / NULLIF(Cases_Cumulative, 0) DESC) AS Rank_Highest,
+        ROW_NUMBER() OVER (PARTITION BY ZIP_Code ORDER BY Deaths_Cumulative * 100.0 / NULLIF(Cases_Cumulative, 0) ASC) AS Rank_Lowest,
+        Population
+    FROM dbo.IL_COVID_ZIP_Code_V1
+    WHERE Cases_Weekly > 0 AND Deaths_Weekly > 0 AND Population <> 0
+)
+SELECT
+    ZIP_Code,
+    Week_Number,
+    Week_Start,
+    Cases_Cumulative,
+    Deaths_Cumulative,
+    LEAST(Deaths_Cumulative * 100.0 / NULLIF(Cases_Cumulative, 0), 100) AS Percent_Positive_Deaths,
+    Population
+FROM RankedData
+WHERE Rank_Highest = 1 OR Rank_Lowest = 1
+ORDER BY ZIP_Code, Rank_Highest, Rank_Lowest;
+
+-- Vaccination and Infection Rate Comparison
+-- TODO: Make LAG and LEAD functions here
